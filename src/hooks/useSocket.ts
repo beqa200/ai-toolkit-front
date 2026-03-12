@@ -1,12 +1,11 @@
-"use client";
+'use client';
 
-import { useEffect, useRef } from "react";
-import { getSocket } from "@/lib/socket";
-import { JobUpdatePayload } from "@/types";
+import { useEffect, useRef } from 'react';
+import { getSocket } from '@/lib/socket';
+import { JobUpdatePayload } from '@/types';
 
 export function useJobUpdates(onUpdate: (payload: JobUpdatePayload) => void) {
   const callbackRef = useRef(onUpdate);
-  callbackRef.current = onUpdate;
 
   useEffect(() => {
     const socket = getSocket();
@@ -15,19 +14,18 @@ export function useJobUpdates(onUpdate: (payload: JobUpdatePayload) => void) {
       callbackRef.current(payload);
     };
 
-    socket.on("jobs:changed", handler);
+    socket.on('jobs:changed', handler);
     return () => {
-      socket.off("jobs:changed", handler);
+      socket.off('jobs:changed', handler);
     };
   }, []);
 }
 
 export function useJobSubscription(
   jobId: string | null,
-  onUpdate: (payload: JobUpdatePayload) => void
+  onUpdate: (payload: JobUpdatePayload) => void,
 ) {
   const callbackRef = useRef(onUpdate);
-  callbackRef.current = onUpdate;
 
   useEffect(() => {
     if (!jobId) return;
@@ -38,12 +36,12 @@ export function useJobSubscription(
       callbackRef.current(payload);
     };
 
-    socket.emit("subscribe", jobId);
-    socket.on("job:update", handler);
+    socket.emit('subscribe', jobId);
+    socket.on('job:update', handler);
 
     return () => {
-      socket.emit("unsubscribe", jobId);
-      socket.off("job:update", handler);
+      socket.emit('unsubscribe', jobId);
+      socket.off('job:update', handler);
     };
   }, [jobId]);
 }
