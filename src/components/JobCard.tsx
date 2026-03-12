@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { GenerationJob } from '@/types';
+import { cancelJob, retryJob } from '@/lib/api';
 import StatusBadge from '@/components/ui/StatusBadge';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -57,8 +58,36 @@ const DownloadIcon = () => (
   </svg>
 );
 
+const RetryIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
+    />
+  </svg>
+);
+
+const StopIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z"
+    />
+  </svg>
+);
+
+const LoadingSpinner = () => (
+  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+  </svg>
+);
+
 interface JobCardProps {
   job: GenerationJob;
+  onJobUpdate?: () => void;
 }
 
 function formatRelativeTime(date: Date): string {
@@ -75,15 +104,42 @@ function formatRelativeTime(date: Date): string {
   return 'Just now';
 }
 
-export default function JobCard({ job }: JobCardProps) {
+export default function JobCard({ job, onJobUpdate }: JobCardProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const isImage = job.type === 'IMAGE';
   const isCompleted = job.status === 'COMPLETED';
   const isFailed = job.status === 'FAILED';
+  const isCancelled = job.status === 'CANCELLED';
   const isProcessing = job.status === 'PENDING' || job.status === 'GENERATING';
 
   const imageUrl = job.resultUrl ? resolveImageUrl(job.resultUrl) : null;
+
+  async function handleRetry() {
+    setIsRetrying(true);
+    try {
+      await retryJob(job.id);
+      onJobUpdate?.();
+    } catch (error) {
+      console.error('Failed to retry job:', error);
+    } finally {
+      setIsRetrying(false);
+    }
+  }
+
+  async function handleCancel() {
+    setIsCancelling(true);
+    try {
+      await cancelJob(job.id);
+      onJobUpdate?.();
+    } catch (error) {
+      console.error('Failed to cancel job:', error);
+    } finally {
+      setIsCancelling(false);
+    }
+  }
 
   return (
     <>
@@ -106,7 +162,7 @@ export default function JobCard({ job }: JobCardProps) {
         )}
 
         {isImage && isProcessing && (
-          <div className="aspect-square bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center">
+          <div className="aspect-square bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center relative">
             <div className="text-center w-full flex flex-col items-center">
               <div className="relative mx-auto">
                 <div className="w-16 h-16 border-4 border-indigo-100 rounded-full" />
@@ -115,6 +171,14 @@ export default function JobCard({ job }: JobCardProps) {
               <p className="text-sm text-indigo-600 font-medium mt-4">Creating magic...</p>
               <p className="text-xs text-indigo-400 mt-1">This may take a moment</p>
             </div>
+            <button
+              onClick={handleCancel}
+              disabled={isCancelling}
+              className="absolute top-3 right-3 flex items-center gap-1.5 px-3 py-1.5 bg-white/90 hover:bg-white text-gray-600 hover:text-red-600 rounded-lg shadow-sm text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              {isCancelling ? <LoadingSpinner /> : <StopIcon />}
+              Cancel
+            </button>
           </div>
         )}
 
@@ -137,6 +201,29 @@ export default function JobCard({ job }: JobCardProps) {
                 </svg>
               </div>
               <p className="text-sm text-red-600 font-medium">Generation failed</p>
+            </div>
+          </div>
+        )}
+
+        {isImage && isCancelled && (
+          <div className="aspect-square bg-gradient-to-br from-gray-50 to-slate-100 flex items-center justify-center">
+            <div className="text-center px-6">
+              <div className="w-12 h-12 mx-auto rounded-full bg-gray-200 flex items-center justify-center mb-3">
+                <svg
+                  className="w-6 h-6 text-gray-500"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"
+                  />
+                </svg>
+              </div>
+              <p className="text-sm text-gray-600 font-medium">Cancelled</p>
             </div>
           </div>
         )}
@@ -200,21 +287,47 @@ export default function JobCard({ job }: JobCardProps) {
             </div>
           )}
 
-          <div className="flex items-center gap-1.5 text-xs text-gray-400 pt-1">
-            <svg
-              className="w-3.5 h-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            {formatRelativeTime(new Date(job.createdAt))}
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-1.5 text-xs text-gray-400">
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              {formatRelativeTime(new Date(job.createdAt))}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {(isFailed || isCancelled) && (
+                <button
+                  onClick={handleRetry}
+                  disabled={isRetrying}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                >
+                  {isRetrying ? <LoadingSpinner /> : <RetryIcon />}
+                  Retry
+                </button>
+              )}
+              
+              {isProcessing && !isImage && (
+                <button
+                  onClick={handleCancel}
+                  disabled={isCancelling}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-red-50 text-gray-600 hover:text-red-600 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                >
+                  {isCancelling ? <LoadingSpinner /> : <StopIcon />}
+                  Cancel
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

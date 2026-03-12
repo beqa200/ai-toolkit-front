@@ -126,7 +126,7 @@ export default function HomePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {jobs.map((job, index) => (
               <div key={job.id} className="animate-fade-in" style={{ animationDelay: `${index * 0.05}s` }}>
-                <JobCard job={job} />
+                <JobCard job={job} onJobUpdate={loadJobs} />
               </div>
             ))}
           </div>

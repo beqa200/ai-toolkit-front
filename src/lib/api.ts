@@ -34,3 +34,28 @@ export function fetchJobs(limit?: number, offset?: number): Promise<GenerationJo
 export function fetchJob(id: string): Promise<GenerationJob> {
   return request(`/api/generations/${id}`);
 }
+
+export interface CancelJobResponse {
+  jobId: string;
+  status: string;
+  message: string;
+}
+
+export function cancelJob(id: string): Promise<CancelJobResponse> {
+  return request(`/api/generations/${id}/cancel`, {
+    method: "POST",
+  });
+}
+
+export interface RetryJobResponse {
+  jobId: string;
+  status: string;
+  originalJobId: string;
+  message: string;
+}
+
+export function retryJob(id: string): Promise<RetryJobResponse> {
+  return request(`/api/generations/${id}/retry`, {
+    method: "POST",
+  });
+}
