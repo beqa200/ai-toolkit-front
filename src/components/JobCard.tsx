@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { GenerationJob } from '@/types';
 import { cancelJob, retryJob } from '@/lib/api';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -108,6 +109,31 @@ export default function JobCard({ job, onJobUpdate }: JobCardProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (lightboxOpen) {
+      document.body.style.overflow = 'hidden';
+      
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          setLightboxOpen(false);
+        }
+      };
+      
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.body.style.overflow = '';
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    } else {
+      document.body.style.overflow = '';
+    }
+  }, [lightboxOpen]);
 
   const isImage = job.type === 'IMAGE';
   const isCompleted = job.status === 'COMPLETED';
@@ -332,9 +358,9 @@ export default function JobCard({ job, onJobUpdate }: JobCardProps) {
         </div>
       </div>
 
-      {lightboxOpen && imageUrl && (
+      {mounted && lightboxOpen && imageUrl && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-fade-in"
           onClick={() => setLightboxOpen(false)}
         >
           <button
@@ -363,7 +389,8 @@ export default function JobCard({ job, onJobUpdate }: JobCardProps) {
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 max-w-2xl px-6 py-3 bg-white/10 backdrop-blur-md rounded-xl">
             <p className="text-white/90 text-sm text-center line-clamp-2">{job.originalPrompt}</p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
